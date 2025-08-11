@@ -15,6 +15,7 @@ export const auth = betterAuth({
     'http://localhost:3000',
     'https://contentport.io',
     'https://www.contentport.io',
+    process.env.NEXT_PUBLIC_BASE_URL!,
   ],
   databaseHooks: {
     user: {

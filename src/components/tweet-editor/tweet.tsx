@@ -38,7 +38,7 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import posthog from 'posthog-js'
-import { PropsWithChildren, useCallback, useRef, useState, useEffect } from 'react'
+import { PropsWithChildren, useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { Icons } from '../icons'
 import {
@@ -62,7 +62,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import ContentLengthIndicator from './content-length-indicator'
 import { Calendar20 } from './date-picker'
 import { ImageTool } from './image-tool'
-import { nanoid } from 'nanoid'
 
 interface TweetProps {
   onDelete?: () => void
@@ -98,6 +97,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
   const [showPostConfirmModal, setShowPostConfirmModal] = useState(false)
   const [skipPostConfirmation, setSkipPostConfirmation] = useState(false)
   const [didTogglePostConfirmation, setDidTogglePostConfirmation] = useState(false)
+  const [communityId, setCommunityId] = useState('')
 
   useEffect(() => {
     setSkipPostConfirmation(localStorage.getItem('skipPostConfirmation') === 'true')
@@ -121,7 +121,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
 
     // Check if this video is already attached
     const existingAttachment = attachments.find(
-      (att) => att.type === 'video' && att.fileKey === mediaFile.s3Key,
+      (att) => att.type === 'video' && att.fileKey === mediaFile.s3Key
     )
 
     if (existingAttachment) {
@@ -297,7 +297,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           fileName: file.name,
           fileType: file.type,
         },
-        { init: { signal: controller.signal } },
+        { init: { signal: controller.signal } }
       )
 
       const { url, fields, fileKey } = await res.json()
@@ -344,7 +344,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           s3Key,
           mediaType,
         },
-        { init: { signal: controller.signal } },
+        { init: { signal: controller.signal } }
       )
 
       return await res.json()
@@ -365,13 +365,16 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
     mutationFn: async ({
       content,
       media,
+      communityId,
     }: {
       content: string
       media: { s3Key: string; media_id: string }[]
+      communityId?: string
     }) => {
       const res = await client.tweet.postImmediate.$post({
         content,
         media,
+        communityId,
       })
 
       return await res.json()
@@ -388,7 +391,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           >
             See tweet
           </Link>
-        </div>,
+        </div>
       )
 
       posthog.capture('tweet_posted', {
@@ -403,13 +406,14 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       })
 
       setMediaFiles([])
+      setCommunityId('')
       shadowEditor.update(
         () => {
           const root = $getRoot()
           root.clear()
           root.append($createParagraphNode())
         },
-        { tag: 'force-sync' },
+        { tag: 'force-sync' }
       )
     },
     onError: (error) => {
@@ -436,11 +440,13 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       content,
       scheduledUnix,
       media,
+      communityId,
     }: {
       tweetId: string
       content: string
       scheduledUnix: number
       media: { s3Key: string; media_id: string }[]
+      communityId?: string
     }) => {
       if (!scheduledUnix) {
         toast.error('Something went wrong, please reload the page.')
@@ -452,6 +458,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
         content,
         scheduledUnix,
         media,
+        communityId,
       })
       return await res.json()
     },
@@ -473,16 +480,19 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       scheduledUnix,
       media,
       showToast = true,
+      communityId,
     }: {
       content: string
       scheduledUnix: number
       media: { s3Key: string; media_id: string }[]
       showToast?: boolean
+      communityId?: string
     }) => {
       const promise = client.tweet.schedule.$post({
         content,
         scheduledUnix,
         media,
+        communityId,
       })
 
       if (showToast) {
@@ -524,10 +534,11 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           root.clear()
           root.append($createParagraphNode())
         },
-        { tag: 'force-sync' },
+        { tag: 'force-sync' }
       )
 
       setMediaFiles([])
+      setCommunityId('')
     },
     onError: (error: HTTPException) => {
       if (error.status === 402) {
@@ -539,7 +550,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
   })
 
   const validateFile = (
-    file: File,
+    file: File
   ): { valid: boolean; type?: 'image' | 'gif' | 'video'; error?: string } => {
     // Check file type
     let mediaType: 'image' | 'gif' | 'video'
@@ -637,8 +648,8 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                   media_key: twitterResult.media_key,
                   s3Key: s3Result.fileKey,
                 }
-              : mf,
-          ),
+              : mf
+          )
         )
 
         posthog.capture('tweet_media_uploaded', {
@@ -652,8 +663,8 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       } catch (error) {
         setMediaFiles((prev) =>
           prev.map((mf) =>
-            mf.url === url ? { ...mf, uploading: false, error: 'Upload failed' } : mf,
-          ),
+            mf.url === url ? { ...mf, uploading: false, error: 'Upload failed' } : mf
+          )
         )
       }
     }
@@ -664,7 +675,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
     if (!items) return
 
     const files: File[] = []
-    
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (!item) continue
@@ -726,10 +737,11 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       s3Key: string
       media_id: string
     }[]
+    communityId?: string
   }
 
   const { mutate: enqueueTweet, isPending: isQueueing } = useMutation({
-    mutationFn: async ({ content, media }: EnqueuePostArgs) => {
+    mutationFn: async ({ content, media, communityId }: EnqueuePostArgs) => {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       const userNow = new Date()
 
@@ -738,6 +750,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
         media,
         timezone,
         userNow,
+        communityId,
       })
 
       return await res.json()
@@ -760,6 +773,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       }
 
       setMediaFiles([])
+      setCommunityId('')
 
       shadowEditor.update(
         () => {
@@ -767,7 +781,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           root.clear()
           root.append($createParagraphNode())
         },
-        { tag: 'force-sync' },
+        { tag: 'force-sync' }
       )
 
       toast.success(
@@ -779,7 +793,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           >
             See queue
           </Link>
-        </div>,
+        </div>
       )
 
       fire({
@@ -814,7 +828,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
         media_id: f.media_id!,
       }))
 
-    enqueueTweet({ content, media })
+    enqueueTweet({ content, media, communityId: communityId.trim() || undefined })
   }
 
   const handleScheduleTweet = (date: Date, time: string) => {
@@ -851,12 +865,14 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
         content,
         scheduledUnix,
         media,
+        communityId: communityId.trim() || undefined,
       })
     } else {
       scheduleTweetMutation.mutate({
         content,
         scheduledUnix,
         media,
+        communityId: communityId.trim() || undefined,
       })
     }
   }
@@ -899,6 +915,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
     postTweetMutation.mutate({
       content,
       media,
+      communityId: communityId.trim() || undefined,
     })
   }
 
@@ -931,7 +948,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
 
     if (editTweetData?.tweet?.scheduledFor) {
       scheduledUnix = Math.floor(
-        new Date(editTweetData.tweet.scheduledFor).getTime() / 1000,
+        new Date(editTweetData.tweet.scheduledFor).getTime() / 1000
       )
     }
 
@@ -952,6 +969,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
       content,
       scheduledUnix,
       media,
+      communityId: communityId.trim() || undefined,
     })
   }
 
@@ -974,10 +992,11 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
         root.clear()
         root.append($createParagraphNode())
       },
-      { tag: 'force-sync' },
+      { tag: 'force-sync' }
     )
 
     setMediaFiles([])
+    setCommunityId('')
   }
 
   const EditModeWrapper = ({ children }: PropsWithChildren) => {
@@ -1015,7 +1034,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
           <div
             className={cn(
               'relative bg-white p-6 rounded-2xl w-full border border-black border-opacity-[0.01] bg-clip-padding group isolate shadow-[0_1px_1px_rgba(0,0,0,0.05),0_4px_6px_rgba(34,42,53,0.04),0_24px_68px_rgba(47,48,55,0.05),0_2px_3px_rgba(0,0,0,0.04)]  transition-colors',
-              isDragging && 'border-indigo-600 border-dashed',
+              isDragging && 'border-indigo-600 border-dashed'
             )}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -1037,7 +1056,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                         spellCheck={false}
                         onPaste={handlePaste}
                         className={cn(
-                          'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+                          'w-full !min-h-16 resize-none text-base/7 leading-relaxed text-stone-800 border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none'
                         )}
                       />
                     }
@@ -1172,10 +1191,30 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                   </div>
                 )}
 
+                {/* Community ID Input */}
+                <div className="mt-3">
+                  <div className="flex items-center gap-2">
+                    <label
+                      htmlFor="community-id"
+                      className="text-sm text-stone-600 min-w-fit"
+                    >
+                      Community ID:
+                    </label>
+                    <input
+                      id="community-id"
+                      type="text"
+                      value={communityId}
+                      onChange={(e) => setCommunityId(e.target.value)}
+                      placeholder="Optional community ID for posting"
+                      className="flex-1 px-3 py-1.5 text-sm border border-stone-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
                 <div className="mt-3 pt-3 border-t border-stone-200 flex items-center justify-between">
                   <div
                     className={cn(
-                      'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg',
+                      'flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-lg'
                     )}
                   >
                     <TooltipProvider>
@@ -1188,7 +1227,7 @@ export default function Tweet({ editMode = false, editTweetId }: TweetProps) {
                             type="button"
                             onClick={() => {
                               const input = document.getElementById(
-                                'media-upload',
+                                'media-upload'
                               ) as HTMLInputElement
                               input?.click()
                             }}

@@ -1,6 +1,6 @@
+import { cors } from 'hono/cors'
 import { dynamic, InferRouterInputs, InferRouterOutputs } from 'jstack'
 import { j } from './jstack'
-import { cors } from 'hono/cors'
 
 /**
  * This is your base API.
@@ -19,11 +19,12 @@ const api = j
         'https://www.contentport.io',
         'https://contentport.vercel.app',
         'https://www.contentport.vercel.app',
+        process.env.NEXT_PUBLIC_BASE_URL!,
       ],
       allowHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
       exposeHeaders: ['x-is-superjson', 'Content-Type', 'content-type'],
       credentials: true,
-    }),
+    })
   )
   .onError(j.defaults.errorHandler)
 

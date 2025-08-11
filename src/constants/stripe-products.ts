@@ -19,5 +19,5 @@ export const STRIPE_SUB_TEMPLATE: Stripe.ProductCreateParams = {
   expand: ['default_price', 'marketing_features'],
   description: 'Schedule unlimited tweets, create unlimited images, and more.',
   statement_descriptor: 'Contentport Pro',
-  images: ['https://www.contentport.io/images/square-og-image.png'],
+  images: [process.env.NEXT_PUBLIC_BASE_URL + '/images/square-og-image.png'],
 }

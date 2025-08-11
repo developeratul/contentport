@@ -7,26 +7,23 @@ import { BUCKET_NAME, s3Client } from '@/lib/s3'
 import { HeadObjectCommand } from '@aws-sdk/client-s3'
 import { Receiver } from '@upstash/qstash'
 import { Ratelimit } from '@upstash/ratelimit'
+import { waitUntil } from '@vercel/functions'
+import {
+  addDays,
+  isAfter,
+  isFuture,
+  isSameDay,
+  setHours,
+  startOfDay,
+  startOfHour,
+} from 'date-fns'
+import { fromZonedTime } from 'date-fns-tz'
 import { and, desc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { SendTweetV2Params, TwitterApi, UserV2 } from 'twitter-api-v2'
 import { z } from 'zod'
 import { j, privateProcedure, publicProcedure } from '../jstack'
 import { getAccount } from './utils/get-account'
-import { waitUntil } from '@vercel/functions'
-import {
-  addDays,
-  addHours,
-  isAfter,
-  isBefore,
-  isFuture,
-  isSameDay,
-  setDay,
-  setHours,
-  startOfDay,
-  startOfHour,
-} from 'date-fns'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 
 const receiver = new Receiver({
   currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY as string,
@@ -47,7 +44,7 @@ async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
           new HeadObjectCommand({
             Bucket: BUCKET_NAME,
             Key: m.s3Key,
-          }),
+          })
         )
 
         const url = `https://${process.env.NEXT_PUBLIC_S3_BUCKET_NAME}.s3.amazonaws.com/${m.s3Key}`
@@ -84,7 +81,7 @@ async function fetchMediaFromS3(media: { s3Key: string; media_id: string }[]) {
         console.error('Failed to fetch media from S3:', error)
         throw new Error('Failed to fetch media from S3')
       }
-    }),
+    })
   )
   return mediaData
 }
@@ -213,7 +210,7 @@ export const tweetRouter = j.router({
       z.object({
         s3Key: z.string(),
         mediaType: z.enum(['image', 'gif', 'video']),
-      }),
+      })
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
@@ -230,7 +227,7 @@ export const tweetRouter = j.router({
       const account = await db.query.account.findFirst({
         where: and(
           eq(accountSchema.userId, user.id),
-          eq(accountSchema.id, activeAccount.id),
+          eq(accountSchema.id, activeAccount.id)
         ),
       })
 
@@ -290,7 +287,7 @@ export const tweetRouter = j.router({
     .input(
       z.object({
         id: z.string(),
-      }),
+      })
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
@@ -331,13 +328,14 @@ export const tweetRouter = j.router({
           z.object({
             media_id: z.string(),
             s3Key: z.string(),
-          }),
+          })
         ),
-      }),
+        communityId: z.string().optional(),
+      })
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { tweetId, content, scheduledUnix, media } = input
+      const { tweetId, content, scheduledUnix, media, communityId } = input
 
       const account = await getAccount({
         email: user.email,
@@ -403,6 +401,7 @@ export const tweetRouter = j.router({
           scheduledUnix: scheduledUnix * 1000,
           media,
           qstashId: messageId,
+          communityId: communityId?.trim() || null,
           updatedAt: new Date(),
         })
         .where(and(eq(tweets.id, tweetId), eq(tweets.userId, user.id)))
@@ -434,15 +433,16 @@ export const tweetRouter = j.router({
           z.object({
             media_id: z.string(),
             s3Key: z.string(),
-          }),
+          })
         ),
+        communityId: z.string().optional(),
         // mediaIds: z.array(z.string()).default([]),
         // s3Keys: z.array(z.string()).default([]),
-      }),
+      })
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { content, scheduledUnix, media } = input
+      const { content, scheduledUnix, media, communityId } = input
 
       const account = await getAccount({
         email: user.email,
@@ -505,6 +505,7 @@ export const tweetRouter = j.router({
           scheduledUnix: scheduledUnix * 1000,
           media,
           qstashId: messageId,
+          communityId: communityId?.trim() || null,
         })
         .returning()
 
@@ -561,7 +562,7 @@ export const tweetRouter = j.router({
       where: and(
         eq(accountSchema.userId, userId),
         // use account that this was scheduled with
-        eq(accountSchema.id, accountId),
+        eq(accountSchema.id, accountId)
       ),
     })
 
@@ -597,11 +598,16 @@ export const tweetRouter = j.router({
         }
       }
 
+      // Add community ID if present
+      if (tweet.communityId && tweet.communityId.trim()) {
+        tweetPayload.community_id = tweet.communityId.trim()
+      }
+
       try {
         console.log('ℹ️ tweet payload', JSON.stringify(tweetPayload, null, 2))
         const res = await client.v2.tweet(tweetPayload)
         res.errors?.map((error) =>
-          console.error('⚠️ Twitter error:', JSON.stringify(error, null, 2)),
+          console.error('⚠️ Twitter error:', JSON.stringify(error, null, 2))
         )
 
         await db
@@ -634,7 +640,7 @@ export const tweetRouter = j.router({
     .input(
       z.object({
         tweetId: z.string(),
-      }),
+      })
     )
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
@@ -669,8 +675,8 @@ export const tweetRouter = j.router({
             eq(tweets.userId, user.id),
             eq(tweets.accountId, account.id),
             eq(tweets.isScheduled, true),
-            eq(tweets.isPublished, false),
-          ),
+            eq(tweets.isPublished, false)
+          )
         )
 
       if (!tweet) {
@@ -709,6 +715,11 @@ export const tweetRouter = j.router({
           }
         }
 
+        // Add community ID if present
+        if (tweet.communityId && tweet.communityId.trim()) {
+          tweetPayload.community_id = tweet.communityId.trim()
+        }
+
         const res = await client.v2.tweet(tweetPayload)
 
         // update the tweet in the database
@@ -724,8 +735,8 @@ export const tweetRouter = j.router({
             and(
               eq(tweets.id, tweetId),
               eq(tweets.userId, user.id),
-              eq(tweets.accountId, account.id),
-            ),
+              eq(tweets.accountId, account.id)
+            )
           )
 
         return c.json({
@@ -751,15 +762,16 @@ export const tweetRouter = j.router({
           z.object({
             media_id: z.string(),
             s3Key: z.string(),
-          }),
+          })
         ),
+        communityId: z.string().optional(),
         // mediaIds: z.array(z.string()).default([]),
         // s3Keys: z.array(z.string()).default([]),
-      }),
+      })
     )
     .post(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { content, media } = input
+      const { content, media, communityId } = input
 
       const account = await getAccount({
         email: user.email,
@@ -802,6 +814,11 @@ export const tweetRouter = j.router({
           }
         }
 
+        // Add community ID if present
+        if (communityId && communityId.trim()) {
+          tweetPayload.community_id = communityId.trim()
+        }
+
         const res = await client.v2.tweet(tweetPayload)
 
         // Save to database
@@ -813,6 +830,7 @@ export const tweetRouter = j.router({
           isScheduled: false,
           isPublished: true,
           twitterId: res.data.id,
+          communityId: communityId?.trim() || null,
         })
 
         return c.json({
@@ -856,7 +874,7 @@ export const tweetRouter = j.router({
           ...tweet,
           media: enrichedMedia,
         }
-      }),
+      })
     )
 
     return c.superjson({ tweets: tweetsWithMedia })
@@ -888,7 +906,7 @@ export const tweetRouter = j.router({
           ...tweet,
           media: enrichedMedia,
         }
-      }),
+      })
     )
 
     return c.superjson({ tweets: tweetsWithMedia, accountId: account.id })
@@ -898,7 +916,7 @@ export const tweetRouter = j.router({
     .input(
       z.object({
         currentTimeUnix: z.number(), // User's current time as Unix timestamp
-      }),
+      })
     )
     .get(async ({ c, ctx, input }) => {
       const { user } = ctx
@@ -968,13 +986,14 @@ export const tweetRouter = j.router({
           z.object({
             media_id: z.string(),
             s3Key: z.string(),
-          }),
+          })
         ),
-      }),
+        communityId: z.string().optional(),
+      })
     )
     .mutation(async ({ c, ctx, input }) => {
       const { user } = ctx
-      const { userNow, timezone, content, media } = input
+      const { userNow, timezone, content, media, communityId } = input
 
       const account = await getAccount({
         email: user.email,
@@ -1073,6 +1092,7 @@ export const tweetRouter = j.router({
             isQueued: true,
             media,
             qstashId: messageId,
+            communityId: communityId?.trim() || null,
           })
           .returning()
       } catch (err) {
@@ -1101,7 +1121,7 @@ export const tweetRouter = j.router({
       z.object({
         userNow: z.date(),
         timezone: z.string(),
-      }),
+      })
     )
     .query(async ({ c, input, ctx }) => {
       const { user } = ctx
@@ -1138,7 +1158,7 @@ export const tweetRouter = j.router({
             ...tweet,
             media: enrichedMedia,
           }
-        }),
+        })
       )
 
       const getSlotTweet = (unix: number) => {
@@ -1180,7 +1200,7 @@ export const tweetRouter = j.router({
         const [dayUnix, timestamps] = Object.entries(day)[0]!
 
         const tweetsForThisDay = scheduledTweets.filter((t) =>
-          isSameDay(t.scheduledUnix!, Number(dayUnix)),
+          isSameDay(t.scheduledUnix!, Number(dayUnix))
         )
 
         const manualForThisDay = tweetsForThisDay.filter((t) => !Boolean(t.isQueued))
@@ -1222,7 +1242,7 @@ export const tweetRouter = j.router({
     .input(
       z.object({
         query: z.string().min(1).max(15),
-      }),
+      })
     )
     .get(async ({ c, ctx, input }) => {
       const { query } = input

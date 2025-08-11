@@ -1,14 +1,6 @@
-import {
-  json,
-  pgTable,
-  text,
-  timestamp,
-  boolean,
-  integer,
-  bigint,
-} from 'drizzle-orm/pg-core'
-import { account, user } from './auth'
 import { InferSelectModel } from 'drizzle-orm'
+import { bigint, boolean, json, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { account, user } from './auth'
 
 type Media = {
   s3Key: string // s3
@@ -26,6 +18,7 @@ export const tweets = pgTable('tweets', {
   s3Keys: json('s3_keys').$type<string[]>().default([]),
   qstashId: text('qstash_id'),
   twitterId: text('twitter_id'),
+  communityId: text('community_id'),
   userId: text('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),

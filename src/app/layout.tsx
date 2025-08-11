@@ -1,10 +1,10 @@
 import { Providers } from '@/components/providers/providers'
+import { Databuddy } from '@databuddy/sdk'
 import { Analytics } from '@vercel/analytics/next'
 import { Metadata, Viewport } from 'next'
 import { Instrument_Serif, JetBrains_Mono, Rubik } from 'next/font/google'
 import { Suspense } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { Databuddy, track } from '@databuddy/sdk'
 
 import './globals.css'
 
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     images: ['/images/og-image.png'],
     creator: '@joshtriedcoding',
   },
-  metadataBase: new URL('https://contentport.io'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL),
 }
 
 const elegant = Instrument_Serif({
